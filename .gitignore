@@ -25,8 +25,9 @@ MANIFEST
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+**/.ipynb_checkpoints/
 
-# Environment variables
+# Environment variables and virtual environments
 .env
 .venv
 env/
@@ -34,6 +35,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+llmenv/
+*env/
+*venv/
 
 # Output directories (model checkpoints, logs, samples, etc.)
 outputs/
@@ -73,6 +77,16 @@ Thumbs.db
 *.ckpt
 *.pb
 *.onnx
+*.bin
+*.safetensors
+*.msgpack
+*.npz
+*.npy
+models/
+checkpoints/
+wandb/
+tensorboard_logs/
+mlruns/
 
 # Large data files
 *.csv
@@ -93,6 +107,15 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+.mypy_cache/
+.tox/
+.nox/
+.hypothesis/
+.prof/
+
+# Jupyter specific
+.jupyter/
+jupyter_config/
 
 # Sensitive information in config files
 *secret*
