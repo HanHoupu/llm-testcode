@@ -8,7 +8,7 @@ class RandomBitwidthDefense:
         self.bitwidths = bitwidths
     
     def random_inference(self, inputs, tokenizer, num_runs=5, gen_args=None):
-        """随机位宽推理，支持自定义生成参数"""
+        """Random bitwidth, support custom generation arguments"""
         if gen_args is None:
             gen_args = {"max_new_tokens": 16, "do_sample": False, "num_beams": 1}
         

@@ -18,21 +18,20 @@ This is a project overview.
 `metrics.py`: Calculates SQuAD performance (EM/F1),and adversarial robustness tests.
 `config_analyzer.py`: Finds all configs files, then tests all configs in batch, returns results as DataFrame.
 `eval_step4_squad.py`: Step 4 evaluation script,evaluates all quantization configs on SQuAD, save results to CSV.
-`experiment_logger.py`: Handles CSV logging for experiment results.
+(unused)`experiment_logger.py`: Saves Step 4–6 experiment results . (JSON logs)
 
-## Adversarial (`src/adversarial/`)
-`attacks.py`: Embedding-PGD and HotFlip attacks.
-`defense.py`: Random bitwidth switching defense.
-`evaluator.py`: Robustness evaluation functions.
+## Adversarial (`src/adversarial/`) step 6
+`attacks.py`: Implements Embedding-PGD and HotFlip attacks.
+`defense.py`: Implements Random bitwidth switching defense.
+`evaluator.py`: Robustness evaluation functions.(inefficient, ~50% code can be reused from previous steps in future)
 
 ## Scripts (`scripts/`)
 `step3_switchable_training.py`: Step 3 training script, train our model in SQuAD with switchable quantization and LoRA branches.
-`step5_cpt_slope.py`: Step 5 cyclic precision training.
-`step6_adversarial_robustness.py`: Step 6 adversarial robustness evaluation.
+`step5_cpt_slope.py`: Step 5 cyclic precision training script, compares step 3 and step 5 result, save results to CSV. (inefficient, ~50% code can be reused from previous steps in future)
+`step6_adversarial_robustness.py`: Step 6 adversarial robustness evaluation script, runs attacks and defenses, evaluates, and saves results to CSV.(inefficient, ~30% code can be reused from previous steps in future)
 
 ## Configs (`configs/`)
 YAML files for different quantization strategies. Format:
-- `default_w_bits`: default bit width
-- `per_layer_bits`: per-layer overrides
+- `default_w_bits`: default bit width(maybe unused in this project cfgs.)
+- `per_layer_bits`: bit width setting for each specific layer.
 
-_Note: `__init__.py` files just import everything for easy use._
