@@ -1,0 +1,34 @@
+# Core ML/DL frameworks
+torch>=2.0.0
+transformers>=4.30.0
+datasets>=2.10.0
+
+# Data processing and analysis
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Evaluation and metrics
+evaluate>=0.4.0
+
+# Progress bars and utilities
+tqdm>=4.64.0
+
+# Configuration management
+PyYAML>=6.0
+
+# Development and testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Jupyter notebook support (optional)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Additional utilities
+pathlib2>=2.3.0  # for older Python compatibility
+argparse>=1.4.0  # usually built-in, but explicit for clarity
+
+# Optional: for advanced features
+# scikit-learn>=1.2.0  # if you need additional ML utilities
+# matplotlib>=3.6.0    # for plotting and visualization
+# seaborn>=0.11.0      # for statistical plotting

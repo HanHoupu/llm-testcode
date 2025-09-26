@@ -1,24 +1,42 @@
 import torch
 import evaluate
+import random
 from tqdm import tqdm
 
-# Direct copy from notebook - eval_config function
-def eval_config(model, tokenizer, val_ds, device, cfg, n=100):
+# SQuAD evaluation with configurable quantization
+def eval_config(model, tokenizer, val_ds, device, cfg, wrappers=None, n=100, seed=42, config_name=None):
     from ..quantization import requantize_model_to_config
-    from ..lora import activate_lora_by_bits
+    from ..lora import activate_lora_by_config
     
     requantize_model_to_config(model, cfg)
-    # activate_lora_by_bits if wrappers exist
+    if wrappers is not None:
+        activate_lora_by_config(wrappers, cfg, config_name=config_name)
+    
+    # Use pre-selected samples (no re-sampling for consistency)
+    selected_samples = val_ds
+    print(f"📊 Evaluating on {len(selected_samples)} pre-selected samples")
     
     metric = evaluate.load("squad")
     preds, refs = [], []
-    for ex in tqdm(val_ds.select(range(min(n, len(val_ds)))), leave=False):
+    for ex in tqdm(selected_samples, leave=False):
+        # Use same format as training
         prompt = f"question: {ex['question']} context: {ex['context']} answer:"
         inp = tokenizer(prompt, return_tensors="pt").to(device)
         with torch.no_grad():
-            out = model.generate(**inp, max_new_tokens=30, pad_token_id=tokenizer.eos_token_id)
+            out = model.generate(
+                **inp,
+                max_new_tokens=16,
+                do_sample=False,
+                num_beams=1,
+                pad_token_id=tokenizer.eos_token_id,
+            )
         gen_ids = out[0, inp['input_ids'].size(1):]
         ans = tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
+        # simple truncation to first clause/newline
+        for sep in ["\n", ".", "?", "!"]:
+            if sep in ans:
+                ans = ans.split(sep, 1)[0].strip()
+                break
         preds.append({"id": ex["id"], "prediction_text": ans})
         refs.append({"id": ex["id"], "answers": ex["answers"]})
     return metric.compute(predictions=preds, references=refs)

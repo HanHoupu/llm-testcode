@@ -40,12 +40,18 @@ class LoRAWrapped(nn.Module):
         self.layer_name = layer_name
 
     def set_active(self, name_or_none):
-        # safe activation with fallback
+        # Strict activation - no fallback, fail fast
         if name_or_none is not None and name_or_none not in self.bank:
-            print(f"Warning: LoRA branch '{name_or_none}' not found in {self.layer_name}, using None")
-            self.active = None
-        else:
-            self.active = name_or_none
+            raise ValueError(f"LoRA branch '{name_or_none}' not found in {self.layer_name}. "
+                           f"Available branches: {list(self.bank.keys())}")
+        
+        self.active = name_or_none
+        
+        # Update requires_grad for all branches
+        for branch_name, lora_module in self.bank.items():
+            is_active = (branch_name == self.active)
+            for param in lora_module.parameters():
+                param.requires_grad = is_active
 
     def forward(self, x):
         y = self.base(x)

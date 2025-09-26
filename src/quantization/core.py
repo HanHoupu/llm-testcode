@@ -16,19 +16,26 @@ class QuantLinear(nn.Module):
         bias: bool = True,
         device=None,
         dtype=None,
+        bits: int = 8,
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
+        self.bits = bits
+        
+        # For true memory savings, we need to pack bits
+        # For now, use int8 as base storage but track actual bits
+        qweight_dtype = torch.int8
+            
         self.register_buffer("qweight",
-            torch.empty(out_features, in_features, dtype=torch.int8, device=device))
+            torch.empty(out_features, in_features, dtype=qweight_dtype, device=device))
         self.register_buffer("w_scale",
             torch.ones(out_features, dtype=torch.float32, device=device))
         self.register_buffer("w_zp",
             torch.zeros(out_features, dtype=torch.int32, device=device))
-        self.register_buffer("fp32_weight", None)  # orignal
-        self.current_bits = None  # current 
+        self.register_buffer("fp32_weight", None)  # original
+        self.current_bits = bits  # track current bits
         if bias:
             self.bias = Parameter(torch.empty(out_features, **factory_kwargs))
         else:
@@ -43,28 +50,36 @@ class QuantLinear(nn.Module):
         if self.current_bits == bits:
             return
         
+        # For dynamic requantization, keep using int8 storage
+        # The actual bit precision is controlled by qmin/qmax in quantization
+        
         self.quantize_from_float(self.fp32_weight, bits=bits)
         self.current_bits = bits
 
     def forward(self, input: Tensor) -> Tensor:
         if torch.any(self.w_zp != 0):
-            # with zero points: (q - zp) * scale
+            # with zero points: (q - zp) * scale -> float32
             W = (self.qweight.int() - self.w_zp.view(-1, 1)).float() * self.w_scale.view(-1, 1)
         else:
-            # simple case: q * scale
+            # simple case: q * scale -> float32
             W = self.qweight.float() * self.w_scale.view(-1, 1)
+        
+        if W.dtype != input.dtype:
+            W = W.to(dtype=input.dtype)
         return F.linear(input, W, self.bias)
 
     def extra_repr(self) -> str:
         return (f"in_features={self.in_features}, out_features={self.out_features}, "
                 f"bias={self.bias is not None}, dtype=int8, per_channel=True")
                 
-    # Get quantization bits for specific layer
+    # Get quantization bits for specific layer (strict mode, like notebook)
     @staticmethod
     def get_bits_for_layer(name: str, cfg: dict) -> int:
-        return cfg["per_layer_bits"].get(name, cfg.get("default_w_bits", 8))
+        if name in cfg["per_layer_bits"]:
+            return cfg["per_layer_bits"][name]
+        return cfg.get("default_w_bits", 8)
 
-    # Main quantization function: float32 -> int8
+    # Main quantization function: float32 -> quantized
     def quantize_from_float(self, weight: torch.Tensor, bits: int = 8):
         # support 2-8 bits quantization
         qmin, qmax = -(2**(bits-1)), 2**(bits-1) - 1 
@@ -72,7 +87,11 @@ class QuantLinear(nn.Module):
         w_max_abs = weight.abs().max(dim=1, keepdim=True)[0]
         w_max_abs = torch.clamp(w_max_abs, min=1e-8)
         scale = w_max_abs / qmax
-        qweight = torch.clamp(torch.round(weight / scale), qmin, qmax).to(torch.int8)
+        qweight = torch.clamp(torch.round(weight / scale), qmin, qmax)
+        
+        # Always use int8 storage, but actual precision is limited by qmin/qmax
+        qweight = qweight.to(torch.int8)
+            
         zero_point = torch.zeros(weight.size(0), dtype=torch.int32, device=weight.device)
         self.qweight.copy_(qweight)
         self.w_scale.copy_(scale.squeeze())
@@ -84,10 +103,10 @@ class QuantLinear(nn.Module):
         bits = cls.get_bits_for_layer(name, cfg)
         q = cls(base.in_features, base.out_features,
                 bias=(base.bias is not None),
-                device=base.weight.device, dtype=base.weight.dtype)
+                device=base.weight.device, dtype=base.weight.dtype,
+                bits=bits)
         with torch.no_grad():
             q.store_fp32_weight(base.weight)
-            bits = cls.get_bits_for_layer(name, cfg)
             q.quantize_from_float(base.weight, bits=bits)
             q.current_bits = bits
             if base.bias is not None:
